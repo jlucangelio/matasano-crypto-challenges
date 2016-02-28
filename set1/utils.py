@@ -25,22 +25,21 @@ SET_BITS = {
 class ByteArray(object):
     @classmethod
     def fromHexString(cls, hexstring):
-        e = cls()
-        e.ba = bytearray.fromhex(hexstring)
-        return e
+        return cls(bytearray.fromhex(hexstring))
 
     @classmethod
     def fromBase64(cls, b64string):
-        pass
+        return cls(bytearray(base64.b64decode(b64string)))
 
     @classmethod
     def fromString(cls, string):
-        e = cls()
-        e.ba = bytearray(string)
-        return e
+        return cls(bytearray(string))
 
-    def __init__(self):
-        self.ba = bytearray()
+    def __init__(self, ba=None):
+        if ba is not None:
+            self.ba = ba
+        else:
+            self.ba = bytearray()
 
     def __eq__(self, other):
         return self.ba == other.ba
@@ -75,6 +74,9 @@ class ByteArray(object):
     def append(self, e):
         self.ba.append(e)
 
+    def extend(self, other):
+        self.ba.extend(other)
+
 
 def fixed_xor(plaintext, key):
     res = ByteArray()
@@ -84,21 +86,27 @@ def fixed_xor(plaintext, key):
     return res
 
 
-def repeating_xor(bplaintext, skey):
-    q = len(bplaintext) // len(skey)
-    r = len(bplaintext) % len(skey)
-    full_key = skey * q + skey[:r]
-    return fixed_xor(bplaintext, ByteArray.fromString(full_key))
+def repeating_xor(bplaintext, bkey):
+    q = len(bplaintext) // len(bkey)
+    r = len(bplaintext) % len(bkey)
+    full_key = ByteArray()
+    for _ in range(q):
+        full_key.extend(bkey.ba)
+    full_key.extend(bkey[:r])
+    return fixed_xor(bplaintext, full_key)
 
 
-def freq_analysis(string):
+def freq_analysis(ba):
     max_count = 0
-    candidate = None
+    candidate_string = None
+    candidate_key = None
+
     for char in range(256):
-        key = ("%x" % char) * len(string)
-        res = fixed_xor(ByteArray.fromHexString(string), ByteArray.fromHexString(key))
+        skey = ("%02x" % char) * len(ba)
+        key = ByteArray.fromHexString(skey)
+        plaintext = fixed_xor(ba, key)
         count = 0
-        for b in res:
+        for b in plaintext:
             c = chr(b)
             if "a" <= c <= "z" or "A" <= c <= "Z":
                 count += 1
@@ -111,9 +119,10 @@ def freq_analysis(string):
 
         if count > max_count:
             max_count = count
-            candidate = res
+            candidate_string = plaintext
+            candidate_key = char
 
-    return candidate, max_count
+    return candidate_string, candidate_key, max_count
 
 
 def set_bits(b):
@@ -133,23 +142,27 @@ def hamming_distance(string1, string2):
 
 
 if __name__ == "__main__":
-    hexstring = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"
+    hexstr = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"
     b64str = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"
 
-    print ByteArray.fromHexString(hexstring).asBase64()
+    print ByteArray.fromHexString(hexstr).asBase64()
 
-    b64res = ByteArray.fromHexString(hexstring).asBase64()
+    b64res = ByteArray.fromHexString(hexstr).asBase64()
     print "hex2base64", b64res == b64str
+
+    hexres = ByteArray.fromBase64(b64str).asHexString()
+    print "base642hex", hexres == hexstr
 
     plaintext = ByteArray.fromHexString("1c0111001f010100061a024b53535009181c")
     key = ByteArray.fromHexString("686974207468652062756c6c277320657965")
     fixed_xor_result = ByteArray.fromHexString("746865206b696420646f6e277420706c6179")
     print "fixed_xor", fixed_xor(plaintext, key) == fixed_xor_result
 
-    print freq_analysis("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")[0]
+    print freq_analysis(ByteArray.fromHexString("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"))
+    print freq_analysis(ByteArray.fromHexString("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"))[0]
 
     line = ByteArray.fromString("Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal")
-    res = repeating_xor(line, "ICE").asHexString()
+    res = repeating_xor(line, ByteArray.fromString("ICE")).asHexString()
     print "repeating_xor", res == "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f"
 
     print set_bits(0), set_bits(0x1), set_bits(0x0A), set_bits(0x78), set_bits(0xF8)
