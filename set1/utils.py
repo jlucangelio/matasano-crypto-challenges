@@ -48,13 +48,16 @@ class ByteArray(object):
         return self.ba != other.ba
 
     def __str__(self):
-        return self.ba.decode()
+        return str(self.ba)
 
     def asHexString(self):
         return "".join(["%02x" % b for b in self.ba])
 
     def asBase64(self):
         return base64.b64encode("".join(str(self)))
+
+    def asString(self):
+        return self.ba.decode()
 
     def __len__(self):
         return len(self.ba)
