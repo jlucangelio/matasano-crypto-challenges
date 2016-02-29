@@ -1,6 +1,8 @@
 import base64
 import binascii
 
+from Crypto.Cipher import AES
+
 
 SET_BITS = {
     0x0: 0, # 0000
@@ -80,6 +82,12 @@ class ByteArray(object):
     def extend(self, other):
         self.ba.extend(other)
 
+    def nblocks(self, blocksize):
+        len(self) // blocksize
+
+    def pkcs7pad(self, blocksize):
+        self.extend(pkcs7(self, blocksize).ba)
+
 
 def fixed_xor(plaintext, key):
     res = ByteArray()
@@ -144,6 +152,32 @@ def hamming_distance(string1, string2):
     return count
 
 
+def pkcs7(ba, blocksize):
+    num_bytes = blocksize - (len(ba) % blocksize)
+    padding = ""
+    if num_bytes > 0:
+        padding = ("%02x" % num_bytes) * num_bytes
+
+    return ByteArray.fromHexString(padding)
+
+
+def aes_ecb_decrypt(ciphertext, key):
+    obj = AES.new(str(key), AES.MODE_ECB, "")
+    return obj.decrypt(str(ciphertext))
+
+
+def aes_ecb_encrypt(plaintext, key):
+    obj = AES.new(str(key), AES.MODE_ECB, "")
+    return obj.encrypt(str(plaintext))
+
+
+def aes_cbc_decrypt(ciphertext, key, iv):
+    # p_i = D_k(C_i) XOR C_{i-1}, C_0 = IV
+    plaintext = ByteArray()
+    for i in range(ciphertext.nblocks(16)):
+        pass
+
+
 if __name__ == "__main__":
     hexstr = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"
     b64str = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"
@@ -170,3 +204,12 @@ if __name__ == "__main__":
 
     print set_bits(0), set_bits(0x1), set_bits(0x0A), set_bits(0x78), set_bits(0xF8)
     print "hamming_distance", hamming_distance("this is a test", "wokka wokka!!!") == 37
+
+    print "pkcs7", pkcs7("YELLOW SUBMARINE", 20)
+    ys = ByteArray.fromString("YELLOW SUBMARINE")
+    key = ByteArray.fromString("YELLOW SUBMARINE")
+    ys.pkcs7pad(20)
+    print "pkcs7pad", ys.asHexString()
+
+    print "aes_ecb_encrypt", aes_ecb_encrypt(key, key)
+    print "aes_ecb_decrypt", aes_ecb_decrypt(aes_ecb_encrypt(key, key), key)

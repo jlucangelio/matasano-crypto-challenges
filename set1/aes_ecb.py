@@ -1,13 +1,11 @@
 import utils
 from Crypto.Cipher import AES
 
-obj = AES.new("YELLOW SUBMARINE", AES.MODE_ECB, "")
-# plaintext = obj.decrypt(message)
+# obj = AES.new("YELLOW SUBMARINE", AES.MODE_ECB, "")
 
-# with open("7.txt") as f:
-#     ba = utils.ByteArray.fromBase64(f.read())
-#     plaintext = obj.decrypt(str(ba))
-#     print plaintext
+with open("7.txt") as f:
+    ba = utils.ByteArray.fromBase64(f.read())
+    print utils.aes_ecb_decrypt(ba, utils.ByteArray.fromString("YELLOW SUBMARINE"))
 
 with open("8.txt") as f:
     for line_index, line in enumerate(f.readlines()):
