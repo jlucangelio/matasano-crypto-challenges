@@ -4,6 +4,9 @@ import binascii
 from Crypto.Cipher import AES
 
 
+AES_BLOCKSIZE_BYTES = 16
+
+
 SET_BITS = {
     0x0: 0, # 0000
     0x1: 1, # 0001
@@ -175,18 +178,32 @@ def aes_ecb_encrypt(plaintext, key):
 
 
 def aes_cbc_decrypt(ciphertext, key, iv):
-    # P_i = D_k(C_i) XOR C_{i-1}, C_0 = IV
+    # P_i = D_k(C_i) ^ C_{i-1}, C_{-1} = IV
     plaintext = ByteArray()
-    for i in range(ciphertext.nblocks(16)):
-        cblock = ciphertext.block(16, i)
-        if i == 0:
-            pblock = fixed_xor(aes_ecb_decrypt(cblock, key), iv)
-        else:
-            pblock = fixed_xor(aes_ecb_decrypt(cblock, key), ciphertext.block(16, i-1))
+    last_cblock = iv
 
+    for i in range(ciphertext.nblocks(AES_BLOCKSIZE_BYTES)):
+        cblock = ciphertext.block(AES_BLOCKSIZE_BYTES, i)
+        pblock = fixed_xor(aes_ecb_decrypt(cblock, key), last_cblock)
+        last_cblock = cblock
         plaintext.extend(pblock)
 
     return plaintext
+
+
+def aes_cbc_encrypt(plaintext, key, iv):
+    # C_i = D_k(P_i ^ C_{i-1}), C_{-1} = IV
+    ciphertext = ByteArray()
+    last_cblock = iv
+
+    for i in range(plaintext.nblocks(AES_BLOCKSIZE_BYTES)):
+        pblock = plaintext.block(AES_BLOCKSIZE_BYTES, i)
+        cblock = aes_ecb_encrypt(fixed_xor(pblock, last_cblock), key)
+        last_cblock = cblock
+        ciphertext.extend(cblock)
+
+    return ciphertext
+
 
 if __name__ == "__main__":
     hexstr = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"
@@ -215,7 +232,7 @@ if __name__ == "__main__":
     print set_bits(0), set_bits(0x1), set_bits(0x0A), set_bits(0x78), set_bits(0xF8)
     print "hamming_distance", hamming_distance("this is a test", "wokka wokka!!!") == 37
 
-    print "pkcs7", pkcs7("YELLOW SUBMARINE", 20)
+    print "pkcs7", pkcs7("YELLOW SUBMARINE", 20).asHexString()
     ys = ByteArray.fromString("YELLOW SUBMARINE")
     key = ByteArray.fromString("YELLOW SUBMARINE")
     ys.pkcs7pad(20)
@@ -223,3 +240,6 @@ if __name__ == "__main__":
 
     print "aes_ecb_encrypt", aes_ecb_encrypt(key, key)
     print "aes_ecb_decrypt", aes_ecb_decrypt(aes_ecb_encrypt(key, key), key)
+
+    iv = ByteArray.fromHexString("00" * AES_BLOCKSIZE_BYTES)
+    print "aes_cbc_decrypt", aes_cbc_decrypt(aes_cbc_encrypt(key, key, iv), key, iv)
