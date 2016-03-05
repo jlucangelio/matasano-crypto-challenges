@@ -83,7 +83,10 @@ class ByteArray(object):
         self.ba.extend(other)
 
     def nblocks(self, blocksize):
-        len(self) // blocksize
+        return len(self) // blocksize
+
+    def block(self, blocksize, i):
+        return self[blocksize*i:blocksize*(i+1)]
 
     def pkcs7pad(self, blocksize):
         self.extend(pkcs7(self, blocksize).ba)
@@ -163,20 +166,27 @@ def pkcs7(ba, blocksize):
 
 def aes_ecb_decrypt(ciphertext, key):
     obj = AES.new(str(key), AES.MODE_ECB, "")
-    return obj.decrypt(str(ciphertext))
+    return ByteArray.fromString(obj.decrypt(str(ciphertext)))
 
 
 def aes_ecb_encrypt(plaintext, key):
     obj = AES.new(str(key), AES.MODE_ECB, "")
-    return obj.encrypt(str(plaintext))
+    return ByteArray.fromString(obj.encrypt(str(plaintext)))
 
 
 def aes_cbc_decrypt(ciphertext, key, iv):
-    # p_i = D_k(C_i) XOR C_{i-1}, C_0 = IV
+    # P_i = D_k(C_i) XOR C_{i-1}, C_0 = IV
     plaintext = ByteArray()
     for i in range(ciphertext.nblocks(16)):
-        pass
+        cblock = ciphertext.block(16, i)
+        if i == 0:
+            pblock = fixed_xor(aes_ecb_decrypt(cblock, key), iv)
+        else:
+            pblock = fixed_xor(aes_ecb_decrypt(cblock, key), ciphertext.block(16, i-1))
 
+        plaintext.extend(pblock)
+
+    return plaintext
 
 if __name__ == "__main__":
     hexstr = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"
