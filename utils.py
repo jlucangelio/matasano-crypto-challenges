@@ -2,7 +2,7 @@ import base64
 import binascii
 
 from Crypto.Cipher import AES
-
+from Crypto.Random import random
 
 AES_BLOCKSIZE_BYTES = 16
 
@@ -39,6 +39,11 @@ class ByteArray(object):
     @classmethod
     def fromString(cls, string):
         return cls(bytearray(string))
+
+    @classmethod
+    def random(cls, nbytes):
+        hexstring = "".join(["%02x" % random.randrange(256) for _ in range(nbytes)])
+        return cls.fromHexString(hexstring)
 
     def __init__(self, ba=None):
         if ba is not None:
@@ -85,11 +90,14 @@ class ByteArray(object):
     def extend(self, other):
         self.ba.extend(other)
 
+    def prepend(self, other):
+        self.ba = other.ba + self.ba
+
     def nblocks(self, blocksize):
         return len(self) // blocksize
 
     def block(self, blocksize, i):
-        return self[blocksize*i:blocksize*(i+1)]
+        return self.__class__(self[blocksize*i:blocksize*(i+1)])
 
     def pkcs7pad(self, blocksize):
         self.extend(pkcs7(self, blocksize).ba)
@@ -196,6 +204,8 @@ def aes_cbc_encrypt(plaintext, key, iv):
     ciphertext = ByteArray()
     last_cblock = iv
 
+    plaintext.pkcs7pad(AES_BLOCKSIZE_BYTES)
+
     for i in range(plaintext.nblocks(AES_BLOCKSIZE_BYTES)):
         pblock = plaintext.block(AES_BLOCKSIZE_BYTES, i)
         cblock = aes_ecb_encrypt(fixed_xor(pblock, last_cblock), key)
@@ -241,5 +251,7 @@ if __name__ == "__main__":
     print "aes_ecb_encrypt", aes_ecb_encrypt(key, key)
     print "aes_ecb_decrypt", aes_ecb_decrypt(aes_ecb_encrypt(key, key), key)
 
+    yss = ByteArray.fromString("YELLOW SUBMARINES")
     iv = ByteArray.fromHexString("00" * AES_BLOCKSIZE_BYTES)
     print "aes_cbc_decrypt", aes_cbc_decrypt(aes_cbc_encrypt(key, key, iv), key, iv)
+    print "aes_cbc_decrypt", aes_cbc_decrypt(aes_cbc_encrypt(yss, key, iv), key, iv)
