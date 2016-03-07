@@ -26,9 +26,7 @@ def unparse(d):
 
 
 def profile_for(email):
-    res = unparse(OrderedDict([("email", email), ("uid", 10), ("role", "user")]))
-    # print res
-    return res
+    return unparse(OrderedDict([("email", email), ("uid", 10), ("role", "user")]))
 
 
 def encrypt_profile(email):
