@@ -14,6 +14,7 @@ YnkK"""
 KEY = utils.ByteArray.random(utils.AES_BLOCKSIZE_BYTES)
 PREFIX = utils.ByteArray.random(random.randrange(1, utils.AES_BLOCKSIZE_BYTES))
 
+
 def oracle(input_data):
     plaintext = utils.ByteArray()
     plaintext.extend(PREFIX)
@@ -26,23 +27,24 @@ def oracle(input_data):
 
 
 def find_prefix_length(bs):
-    zeros = "00" * bs * 2
+    zeros = "0" * bs * 2
 
     for i in range(bs):
-        prefix = "00" * i + zeros
+        prefix = "0" * i + zeros
+        print prefix
         ctext = oracle(prefix)
         blocks = ctext.blocksAsHexStrings(bs)
-        print blocks
 
         last_block = blocks[0]
-        for i, block in enumerate(blocks):
-            if i == 0:
+        for bindex, block in enumerate(blocks):
+            if bindex == 0:
                 continue
             if block == last_block:
                 return bs - i
+
             last_block = block
 
-    print "No match"
+    print "Can't find prefix length"
 
 
 if __name__ == "__main__":
@@ -71,6 +73,9 @@ if __name__ == "__main__":
 
     prefix_length = find_prefix_length(bs)
     print "prefix_length", prefix_length
+    l = l - prefix_length
+    print "l", l
+    rest = bs - prefix_length
 
     for unknown_block in range(l / bs):
         print unknown_block
@@ -78,12 +83,12 @@ if __name__ == "__main__":
             blocks.clear()
 
             for c in range(256):
-                attempt = "A" * prefix_length + "A" * (bs - i - 1) + unknown_string + chr(c)
+                attempt = "A" * rest + "A" * (bs - i - 1) + unknown_string + chr(c)
                 ctext = oracle(attempt)
                 block = ctext.block(bs, unknown_block + 1).asHexString()
                 blocks[block] = attempt
 
-            input_data = "A" * (bs - i - 1)
+            input_data = "A" * rest + "A" * (bs - i - 1)
             ctext = oracle(input_data).block(bs, unknown_block + 1).asHexString()
             block = blocks[ctext]
             unknown_string += block[-1]
