@@ -99,6 +99,15 @@ class ByteArray(object):
     def block(self, blocksize, i):
         return self.__class__(self[blocksize*i:blocksize*(i+1)])
 
+    def blocks(self, blocksize):
+        res = []
+        for i in range(self.nblocks(blocksize)):
+            res.append(self.block(blocksize, i))
+        return res
+
+    def blocksAsHexStrings(self, blocksize):
+        return [b.asHexString() for b in self.blocks(blocksize)]
+
     def pkcs7pad(self, blocksize):
         self.extend(pkcs7(self, blocksize).ba)
 
