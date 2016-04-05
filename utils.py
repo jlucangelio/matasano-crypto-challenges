@@ -27,6 +27,14 @@ SET_BITS = {
 }
 
 
+class Error(Exception):
+    pass
+
+
+class PaddingError(Error):
+    pass
+
+
 class ByteArray(object):
     @classmethod
     def fromHexString(cls, hexstring):
@@ -110,6 +118,12 @@ class ByteArray(object):
 
     def pkcs7pad(self, blocksize):
         self.extend(pkcs7(self, blocksize).ba)
+
+    def bitwise_and(self, bidx, byte):
+        self.ba[bidx] = self.ba[bidx] & byte
+
+    def bitwise_or(self, bidx, byte):
+        self.ba[bidx] = self.ba[bidx] | byte
 
 
 def fixed_xor(plaintext, key):
@@ -224,6 +238,19 @@ def aes_cbc_encrypt(plaintext, key, iv):
     return ciphertext
 
 
+def pkcs7validate(plaintext):
+    block = plaintext.block(AES_BLOCKSIZE_BYTES, plaintext.nblocks(AES_BLOCKSIZE_BYTES) - 1)
+    num = block[-1]
+    if num > 15:
+        return plaintext
+
+    padding = block[-num:]
+    if all([b == num for b in padding]):
+        return ByteArray(plaintext[:-num])
+    else:
+        raise PaddingError()
+
+
 if __name__ == "__main__":
     hexstr = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"
     b64str = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"
@@ -264,3 +291,9 @@ if __name__ == "__main__":
     iv = ByteArray.fromHexString("00" * AES_BLOCKSIZE_BYTES)
     print "aes_cbc_decrypt", aes_cbc_decrypt(aes_cbc_encrypt(key, key, iv), key, iv)
     print "aes_cbc_decrypt", aes_cbc_decrypt(aes_cbc_encrypt(yss, key, iv), key, iv)
+
+    print "24", len(pkcs7validate(ByteArray.fromHexString("AA" * 24 + "08" * 8)))
+    try:
+        pkcs7validate(ByteArray.fromHexString("AA" * 24 + "09" * 8))
+    except PaddingError as pe:
+        print "Bad padding raises PaddingError"
