@@ -255,15 +255,16 @@ def aes_cbc_encrypt(plaintext, key, iv):
 
 
 def pkcs7validate(plaintext):
-    block = plaintext.block(AES_BLOCKSIZE_BYTES, plaintext.nblocks(AES_BLOCKSIZE_BYTES) - 1)
-    num = block[-1]
-    if num > 16:
+    last_block = plaintext.block(AES_BLOCKSIZE_BYTES, -1)
+    num = last_block[AES_BLOCKSIZE_BYTES - 1]
+    if num > AES_BLOCKSIZE_BYTES:
         raise PaddingError()
 
-    if num < 16:
-        padding = block[-num:]
+    if num < AES_BLOCKSIZE_BYTES:
+        padding = last_block[-num:]
     else:
-        padding = block
+        padding = last_block
+
     if all([b == num for b in padding]):
         return ByteArray(plaintext[:-num])
     else:
