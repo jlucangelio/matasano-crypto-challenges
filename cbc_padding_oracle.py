@@ -22,7 +22,7 @@ def encrypt():
     p = utils.ByteArray.fromBase64(s)
     # q = utils.ByteArray.fromBase64(s)
     # q.pkcs7pad(utils.AES_BLOCKSIZE_BYTES)
-    # print q.asHexString()
+    # print q.blocksAsHexStrings(utils.AES_BLOCKSIZE_BYTES)
     iv = utils.ByteArray.random_block()
     c = utils.aes_cbc_encrypt(p, KEY, iv)
     return c, iv
@@ -42,36 +42,48 @@ def decrypt(ciphertext, iv):
 
 c, iv = encrypt()
 
-if len(c) < 3:
+all_decrypted_bytes = []
+
+nblocks = c.nblocks(utils.AES_BLOCKSIZE_BYTES)
+if nblocks < 3:
     print "short ciphertext"
     sys.exit(1)
 
-previous_cblock = c.block(utils.AES_BLOCKSIZE_BYTES, -2)
-corrupted = utils.ByteArray.fromHexString("00" * utils.AES_BLOCKSIZE_BYTES)
-corrupted.extend(c.block(utils.AES_BLOCKSIZE_BYTES, -1))
-# print "len(corrupted)", len(corrupted)
+for nblock in range(0, nblocks):
+    if nblock == 0:
+        previous_cblock = iv
+    else:
+        previous_cblock = c.block(utils.AES_BLOCKSIZE_BYTES, nblock - 1)
+    corrupted = utils.ByteArray.fromHexString("00" * utils.AES_BLOCKSIZE_BYTES)
+    corrupted.extend(c.block(utils.AES_BLOCKSIZE_BYTES, nblock))
+    # print "len(corrupted)", len(corrupted)
 
-decrypted_bytes = [None for _ in range(16)]
-# for count in range(1, utils.AES_BLOCKSIZE_BYTES + 1):
-for count in range(1, 2):
-    print "count", count
-    byte_idx = utils.AES_BLOCKSIZE_BYTES - count
-    print "byte_idx", byte_idx
-    padding_value = count
+    decrypted_bytes = [None for _ in range(16)]
+    for count in range(1, utils.AES_BLOCKSIZE_BYTES + 1):
+        # print "count", count
+        byte_idx = utils.AES_BLOCKSIZE_BYTES - count
+        # print "byte_idx", byte_idx
+        padding_value = count
 
-    # Set previous bytes.
-    # for prev_idx in range(utils.AES_BLOCKSIZE_BYTES - count + 1, utils.AES_BLOCKSIZE_BYTES):
-    #     print "prev_idx", prev_idx
-    #     ri = corrupted.get_byte(prev_idx)
-    #     corrupted.set_byte(prev_idx, ri ^ decrypted_bytes[prev_idx] ^ padding_value)
+        # Set previous bytes.
+        for prev_idx in range(utils.AES_BLOCKSIZE_BYTES - count + 1, utils.AES_BLOCKSIZE_BYTES):
+            # print "prev_idx", prev_idx
+            ri = corrupted.get_byte(prev_idx)
+            corrupted.set_byte(prev_idx, decrypted_bytes[prev_idx] ^
+                               previous_cblock.get_byte(prev_idx) ^
+                               padding_value)
 
-    # Try current byte.
-    for i in range(256):
-        rb = corrupted.get_byte(byte_idx)
-        corrupted.set_byte(byte_idx, i)
-        if decrypt(corrupted, iv):
-            decrypted_bytes[byte_idx] = hex(previous_cblock.get_byte(byte_idx) ^ i ^ 0x1)
-            corrupted.set_byte(byte_idx, rb)
-            break
+        # Try current byte.
+        for i in range(256):
+            rb = corrupted.get_byte(byte_idx)
+            corrupted.set_byte(byte_idx, i)
+            if decrypt(corrupted, iv):
+                decrypted_bytes[byte_idx] = (previous_cblock.get_byte(byte_idx) ^
+                                             i ^ padding_value)
+                corrupted.set_byte(byte_idx, rb)
+                break
 
-print decrypted_bytes
+    all_decrypted_bytes.extend(decrypted_bytes)
+
+plaintext = utils.ByteArray.fromHexString("".join(["%02x" % h for h in all_decrypted_bytes]))
+print utils.pkcs7validate(plaintext)
