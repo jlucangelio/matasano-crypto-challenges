@@ -53,6 +53,14 @@ class ByteArray(object):
         hexstring = "".join(["%02x" % random.randrange(256) for _ in range(nbytes)])
         return cls.fromHexString(hexstring)
 
+    @classmethod
+    def random_key(cls):
+        return cls.random(AES_BLOCKSIZE_BYTES)
+
+    @classmethod
+    def random_block(cls):
+        return cls.random(AES_BLOCKSIZE_BYTES)
+
     def __init__(self, ba=None):
         if ba is not None:
             self.ba = ba
@@ -105,6 +113,8 @@ class ByteArray(object):
         return len(self) // blocksize
 
     def block(self, blocksize, i):
+        if i < 0:
+            i = i + self.nblocks(blocksize)
         return self.__class__(self[blocksize*i:blocksize*(i+1)])
 
     def blocks(self, blocksize):
@@ -119,11 +129,17 @@ class ByteArray(object):
     def pkcs7pad(self, blocksize):
         self.extend(pkcs7(self, blocksize).ba)
 
-    def bitwise_and(self, bidx, byte):
-        self.ba[bidx] = self.ba[bidx] & byte
+    def bitwise_and(self, byte_idx, byte):
+        self.ba[byte_idx] = self.ba[byte_idx] & byte
 
-    def bitwise_or(self, bidx, byte):
-        self.ba[bidx] = self.ba[bidx] | byte
+    def bitwise_or(self, byte_idx, byte):
+        self.ba[byte_idx] = self.ba[byte_idx] | byte
+
+    def get_byte(self, byte_idx):
+        return self.ba[byte_idx]
+
+    def set_byte(self, byte_idx, byte):
+        self.ba[byte_idx] = byte
 
 
 def fixed_xor(plaintext, key):
@@ -191,10 +207,10 @@ def hamming_distance(string1, string2):
 
 def pkcs7(ba, blocksize):
     num_bytes = blocksize - (len(ba) % blocksize)
-    padding = ""
-    if num_bytes > 0:
-        padding = ("%02x" % num_bytes) * num_bytes
+    if num_bytes == 0:
+        num_bytes = block_size
 
+    padding = ("%02x" % num_bytes) * num_bytes
     return ByteArray.fromHexString(padding)
 
 
@@ -241,10 +257,13 @@ def aes_cbc_encrypt(plaintext, key, iv):
 def pkcs7validate(plaintext):
     block = plaintext.block(AES_BLOCKSIZE_BYTES, plaintext.nblocks(AES_BLOCKSIZE_BYTES) - 1)
     num = block[-1]
-    if num > 15:
-        return plaintext
+    if num > 16:
+        raise PaddingError()
 
-    padding = block[-num:]
+    if num < 16:
+        padding = block[-num:]
+    else:
+        padding = block
     if all([b == num for b in padding]):
         return ByteArray(plaintext[:-num])
     else:
@@ -278,7 +297,8 @@ if __name__ == "__main__":
     print set_bits(0), set_bits(0x1), set_bits(0x0A), set_bits(0x78), set_bits(0xF8)
     print "hamming_distance", hamming_distance("this is a test", "wokka wokka!!!") == 37
 
-    print "pkcs7", pkcs7("YELLOW SUBMARINE", 20).asHexString()
+    print "pkcs7", pkcs7(ByteArray.fromString("YELLOW SUBMARINE"), 20).asHexString()
+    print "16", pkcs7(ByteArray.fromString("A" * 16), 16)[-1]
     ys = ByteArray.fromString("YELLOW SUBMARINE")
     key = ByteArray.fromString("YELLOW SUBMARINE")
     ys.pkcs7pad(20)
@@ -294,6 +314,15 @@ if __name__ == "__main__":
 
     print "24", len(pkcs7validate(ByteArray.fromHexString("AA" * 24 + "08" * 8)))
     try:
+        print "Should raise PaddingError..."
         pkcs7validate(ByteArray.fromHexString("AA" * 24 + "09" * 8))
+        print "... did not raise PaddingError"
     except PaddingError as pe:
-        print "Bad padding raises PaddingError"
+        print "... raised PaddingError"
+
+    try:
+        print "Should raise PaddingError..."
+        pkcs7validate(ByteArray.fromHexString("AA" * 32))
+        print "... did not raise PaddingError"
+    except PaddingError as pe:
+        print "... raised PaddingError"
