@@ -258,23 +258,23 @@ def aes_cbc_encrypt(plaintext, key, iv):
     return ciphertext
 
 
-def aes_ctr_decrypt(ciphertext, key, nonce):
+def aes_ctr_encrypt(plaintext, key, nonce):
     counter = 0
-    plaintext = ByteArray()
+    ciphertext = ByteArray()
     banonce = bytearray.fromhex("%016x" % nonce)
     banonce.reverse()
 
-    for i in range(ciphertext.nblocks(AES_BLOCKSIZE_BYTES)):
+    for i in range(plaintext.nblocks(AES_BLOCKSIZE_BYTES)):
         bacounter = bytearray.fromhex("%016x" % counter)
         bacounter.reverse()
         source = ByteArray(banonce + bacounter)
-        cblock = ciphertext.block(AES_BLOCKSIZE_BYTES, i)
+        pblock = plaintext.block(AES_BLOCKSIZE_BYTES, i)
         keystream = aes_ecb_encrypt(source, key)
-        pblock = fixed_xor(cblock, keystream)
-        plaintext.extend(pblock)
+        cblock = fixed_xor(pblock, keystream)
+        ciphertext.extend(cblock)
         counter += 1
 
-    return plaintext
+    return ciphertext
 
 
 def aes_ctr_encrypt(plaintext, key, nonce):
