@@ -277,6 +277,10 @@ def aes_ctr_decrypt(ciphertext, key, nonce):
     return plaintext
 
 
+def aes_ctr_encrypt(plaintext, key, nonce):
+    return aes_ctr_decrypt(plaintext, key, nonce)
+
+
 def pkcs7validate(plaintext):
     last_block = plaintext.block(AES_BLOCKSIZE_BYTES, -1)
     num = last_block[AES_BLOCKSIZE_BYTES - 1]
